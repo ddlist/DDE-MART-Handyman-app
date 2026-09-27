@@ -6,12 +6,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../core/nav.dart';
+import '../../core/permissions.dart';
 import '../../core/push.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
@@ -190,6 +192,43 @@ class _WorkerSosScreenState extends ConsumerState<WorkerSosScreen> {
         const Text(
           'Emergency SOS. Sends your location to DDE-Mart safety staff.',
           style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.my_location_outlined),
+          label: const Text('Fill from GPS'),
+          onPressed: _busy
+              ? null
+              : () async {
+                  final ok = await ref
+                      .read(permissionServiceProvider)
+                      .ensure(context, AppPermission.location);
+                  if (!ok) return;
+                  if (!await Geolocator.isLocationServiceEnabled()) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text(
+                                'Location services are off. Enable GPS.')),
+                      );
+                    }
+                    return;
+                  }
+                  try {
+                    final position =
+                        await Geolocator.getCurrentPosition();
+                    _lat.text = '${position.latitude}';
+                    _lng.text = '${position.longitude}';
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content:
+                                Text('Could not fix location.')),
+                      );
+                    }
+                  }
+                },
         ),
         const SizedBox(height: 12),
         TextField(

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_store.dart';
 import 'config.dart';
+import 'session.dart';
 
 class ApiException implements Exception {
   ApiException(this.message, {this.status});
@@ -40,6 +41,15 @@ final dioProvider = Provider<Dio>((ref) {
       },
       onError: (error, handler) {
         final response = error.response;
+        if (response != null &&
+            shouldForceSignOut(
+              status: response.statusCode,
+              path: error.requestOptions.path,
+            )) {
+          // Fire-and-forget: the router gate picks up the signed-out state
+          // and routes to sign-in; the original error still reaches the UI.
+          ref.read(authStoreProvider.notifier).signOut();
+        }
         if (response != null) {
           final data = response.data;
           final message = data is Map && data['message'] is String
