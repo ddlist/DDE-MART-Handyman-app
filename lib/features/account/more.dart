@@ -7,10 +7,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../core/nav.dart';
 import '../../core/push.dart';
+import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../auth/worker_auth_api.dart';
 
 class WorkerPayoutsApi {
@@ -130,18 +134,29 @@ class _WorkerPayoutsScreenState extends ConsumerState<WorkerPayoutsScreen> {
         payouts.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Text(apiMessage(e)),
-          data: (rows) => Column(
-            children: [
-              if (rows.isEmpty) const Text('No payouts yet.'),
-              for (final row in rows)
-                Card(
-                  child: ListTile(
-                    title: Text('${row['amount']} · ${row['method']}'),
-                    trailing: Text('${row['status']}'),
+          data: (rows) {
+            if (rows.isEmpty) {
+              return const EmptyState(
+                message: 'No payouts yet. Request one above.',
+                icon: Icons.payments_outlined,
+              );
+            }
+            return Column(
+              children: [
+                for (final row in rows)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(
+                          Icons.account_balance_outlined),
+                      title: Text(
+                          '${row['amount']} · ${row['method'] ?? ''}'),
+                      trailing: StatusChip(
+                          status: '${row['status'] ?? ''}'),
+                    ),
                   ),
-                ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -233,23 +248,120 @@ class WorkerProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStoreProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return FutureBuilder<Map<String, dynamic>>(
       future: ref.watch(workerAuthApiProvider).me(),
       builder: (context, snapshot) {
         final me = snapshot.data;
+        final name = '${me?['name'] ?? auth.name ?? 'Handyman'}';
+        final initial =
+            name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
 
         return ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              '${me?['name'] ?? auth.name ?? ''}',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
             if (snapshot.hasError) Text(apiMessage(snapshot.error!)),
-            const SizedBox(height: 24),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      child: Text(initial,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text(name,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge),
+                          Text(
+                              '${me?['phone'] ?? auth.phone ?? ''}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: ListTile(
+                leading:
+                    const Icon(Icons.handyman_outlined),
+                title: const Text('My jobs'),
+                trailing:
+                    const Icon(Icons.chevron_right),
+                onTap: () => context.safePush('/jobs'),
+              ),
+            ),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text('Appearance',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall),
+                    const SizedBox(height: 8),
+                    SegmentedButton<ThemeMode>(
+                      segments: const [
+                        ButtonSegment(
+                            value: ThemeMode.system,
+                            label: Text('Auto')),
+                        ButtonSegment(
+                            value: ThemeMode.light,
+                            label: Text('Light')),
+                        ButtonSegment(
+                            value: ThemeMode.dark,
+                            label: Text('Dark')),
+                      ],
+                      selected: {themeMode},
+                      onSelectionChanged: (set) => ref
+                          .read(themeModeProvider.notifier)
+                          .set(set.first),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             FilledButton.tonal(
               onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Sign out?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () =>
+                            Navigator.pop(context, false),
+                        child: const Text('Stay'),
+                      ),
+                      FilledButton(
+                        onPressed: () =>
+                            Navigator.pop(context, true),
+                        child: const Text('Sign out'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm != true || !context.mounted) return;
                 try {
                   await ref.read(workerAuthApiProvider).logout();
                 } finally {
@@ -259,6 +371,19 @@ class WorkerProfileScreen extends ConsumerWidget {
                 }
               },
               child: const Text('Sign out'),
+            ),
+            const SizedBox(height: 16),
+            FutureBuilder<PackageInfo>(
+              future: PackageInfo.fromPlatform(),
+              builder: (context, info) => Center(
+                child: Text(
+                  (info.data?.version ?? '').isEmpty
+                      ? ''
+                      : 'v${info.data!.version}',
+                  style:
+                      Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
             ),
           ],
         );

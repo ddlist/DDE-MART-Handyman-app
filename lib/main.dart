@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/push.dart';
+import 'core/theme.dart';
 import 'router.dart';
 
 void main() {
@@ -22,15 +23,9 @@ class DdeHandymanApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'DDE Handyman',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFFF59E0B),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorSchemeSeed: const Color(0xFFF59E0B),
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
+      theme: DdeHandymanTheme.light(),
+      darkTheme: DdeHandymanTheme.dark(),
+      themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
     );
   }

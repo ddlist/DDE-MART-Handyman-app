@@ -7,9 +7,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
+import '../../core/nav.dart';
+import '../../core/widgets.dart';
 
 class WorkerJob {
   WorkerJob({
@@ -100,19 +101,56 @@ class WorkerJobsScreen extends ConsumerWidget {
       data: (rows) => RefreshIndicator(
         onRefresh: () async => ref.invalidate(workerJobsProvider),
         child: rows.isEmpty
-            ? const Center(child: Text('No jobs assigned.'))
+            ? const EmptyState(
+                message: 'No jobs assigned. New jobs pop up here.',
+                icon: Icons.handyman_outlined,
+              )
             : ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
                   for (final job in rows)
                     Card(
-                      child: ListTile(
-                        title: Text('${job.number} · ${job.customer}'),
-                        subtitle: Text(
-                          '${job.status} · ${job.total.toStringAsFixed(2)}',
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () =>
+                            context.safePush('/job/${job.id}'),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${job.number} · ${job.customer}',
+                                      style: const TextStyle(
+                                          fontWeight:
+                                              FontWeight.w700),
+                                    ),
+                                  ),
+                                  StatusChip(
+                                      status: job.status),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Total ${job.total.toStringAsFixed(2)}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                  const Spacer(),
+                                  const Icon(Icons.chevron_right,
+                                      size: 20),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => context.push('/job/${job.id}'),
                       ),
                     ),
                 ],
@@ -171,37 +209,114 @@ class _WorkerJobDetailScreenState
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                '${job['number'] ?? ''} · $status',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              Text('Customer: ${job['customer'] ?? '—'}'),
-              Text('Address: ${job['address'] ?? '—'}'),
-              Text('Total ${job['total']}'),
-              if ('${job['notes'] ?? ''}'.isNotEmpty)
-                Text('Notes: ${job['notes']}'),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final move in nextMoves(status))
-                    FilledButton.tonal(
-                      onPressed: _busy ? null : () => _move(move),
-                      child: Text(move),
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(workerJobsProvider);
+            },
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${job['number'] ?? 'Job #${job['id']}'}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge,
+                              ),
+                            ),
+                            StatusChip(status: status),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total ${job['total'] ?? ''}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall,
+                        ),
+                      ],
                     ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text('Timeline', style: Theme.of(context).textTheme.titleMedium),
-              for (final entry in timeline)
-                ListTile(
-                  leading: const Icon(Icons.circle, size: 10),
-                  title: Text('${entry['to'] ?? entry['to_status']}'),
+                  ),
                 ),
-            ],
+                const SizedBox(height: 12),
+                Card(
+                  child: ListTile(
+                    leading:
+                        const Icon(Icons.person_outline),
+                    title: Text(
+                        '${job['customer'] ?? 'Customer'}'),
+                    subtitle: Text(
+                        '${job['address'] ?? 'No address on file'}'),
+                  ),
+                ),
+                if ('${job['notes'] ?? ''}'.isNotEmpty)
+                  Card(
+                    child: ListTile(
+                      leading:
+                          const Icon(Icons.note_outlined),
+                      title: const Text('Notes'),
+                      subtitle: Text('${job['notes']}'),
+                    ),
+                  ),
+                if (nextMoves(status).isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final move in nextMoves(status))
+                        FilledButton.tonal(
+                          onPressed:
+                              _busy ? null : () => _move(move),
+                          child: Text(move),
+                        ),
+                    ],
+                  ),
+                ],
+                if (timeline.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text('Timeline',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium),
+                          const SizedBox(height: 8),
+                          for (final entry in timeline)
+                            ListTile(
+                              contentPadding:
+                                  EdgeInsets.zero,
+                              leading: Icon(
+                                Icons.circle,
+                                size: 10,
+                                color: StatusChip.colorFor(
+                                    '${entry['to'] ?? entry['to_status'] ?? ''}'),
+                              ),
+                              title: Text(
+                                  '${entry['to'] ?? entry['to_status'] ?? ''}'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 80),
+              ],
+            ),
           );
         },
       ),
