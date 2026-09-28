@@ -79,17 +79,36 @@ String apiMessage(Object error) {
   return 'Something went wrong. Please try again.';
 }
 
+/// Admin-uploaded brand logo URL (from app-config branding), if set.
+final brandLogoProvider = StateProvider<String?>((ref) => null);
+
+/// Resolves a relative storage path against the API host.
+String? resolveAsset(String? path) {
+  if (path == null || path.isEmpty) return null;
+  if (path.startsWith('http://') ||
+      path.startsWith('https://') ||
+      path.startsWith('//')) {
+    return path;
+  }
+  final base = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
+  final clean = path.replaceAll(RegExp(r'^/+(storage/)?'), '');
+  return '$base/storage/$clean';
+}
+
 class LaunchConfig {
   LaunchConfig({
     required this.maintenance,
     required this.minVersions,
     required this.supportEmail,
     required this.supportPhone,
+    this.brandLogo,
   });
 
   factory LaunchConfig.fromJson(Map<String, dynamic> json) {
     final min = (json['min_versions'] as Map?) ?? {};
     final support = (json['support'] as Map?) ?? {};
+    final branding = (json['branding'] as Map?) ?? {};
+    final logo = branding['logo'];
     return LaunchConfig(
       maintenance: json['maintenance'] == true,
       minVersions: {
@@ -98,6 +117,7 @@ class LaunchConfig {
       },
       supportEmail: '${support['email'] ?? ''}',
       supportPhone: '${support['phone'] ?? ''}',
+      brandLogo: logo is String && logo.isNotEmpty ? logo : null,
     );
   }
 
@@ -105,4 +125,5 @@ class LaunchConfig {
   final Map<String, String> minVersions;
   final String supportEmail;
   final String supportPhone;
+  final String? brandLogo;
 }

@@ -1,5 +1,6 @@
 // DDE-Mart handyman app — job moves + gate + stories unit tests.
 
+import 'package:dde_handyman/core/api_client.dart';
 import 'package:dde_handyman/core/gate.dart';
 import 'package:dde_handyman/features/jobs/worker_jobs.dart';
 import 'package:dio/dio.dart';
@@ -92,6 +93,34 @@ void main() {
     test('empty feed yields empty rail', () async {
       final api = WorkerJobsApi(_storiesDio([]));
       expect(await api.fetchStories(), isEmpty);
+    });
+  });
+
+  group('branding', () {
+    test('logo parsed from app-config branding', () {
+      final config = LaunchConfig.fromJson({
+        'maintenance': false,
+        'min_versions': {},
+        'support': {},
+        'branding': {'logo': '/storage/logos/worker.png'},
+      });
+      expect(config.brandLogo, '/storage/logos/worker.png');
+    });
+
+    test('missing branding degrades to null', () {
+      final config = LaunchConfig.fromJson({'maintenance': false});
+      expect(config.brandLogo, isNull);
+    });
+
+    test('resolveAsset builds absolute storage URL', () {
+      expect(
+        resolveAsset('/storage/logos/worker.png'),
+        endsWith('/storage/logos/worker.png'),
+      );
+      expect(resolveAsset('logos/worker.png'),
+          endsWith('/storage/logos/worker.png'));
+      expect(resolveAsset(null), isNull);
+      expect(resolveAsset('https://cdn.test/l.png'), 'https://cdn.test/l.png');
     });
   });
 }

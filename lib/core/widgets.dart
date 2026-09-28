@@ -5,6 +5,7 @@
 // timeline dots, payout rows and the compact stories strip.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_client.dart';
 import 'theme.dart';
@@ -128,7 +129,8 @@ class ErrorRetry extends StatelessWidget {
 }
 
 /// Gradient hero header used at the top of every tab.
-class GradientHeader extends StatelessWidget {
+/// Shows the admin-uploaded brand logo when present, else the icon tile.
+class GradientHeader extends ConsumerWidget {
   const GradientHeader({
     super.key,
     required this.title,
@@ -143,7 +145,8 @@ class GradientHeader extends StatelessWidget {
   final IconData icon;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final logo = ref.watch(brandLogoProvider);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
@@ -165,7 +168,19 @@ class GradientHeader extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, color: Colors.white, size: 26),
+              child: logo != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.network(
+                        logo,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stack) =>
+                            Icon(icon, color: Colors.white, size: 26),
+                      ),
+                    )
+                  : Icon(icon, color: Colors.white, size: 26),
             ),
             const SizedBox(width: 12),
             Expanded(

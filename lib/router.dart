@@ -24,6 +24,8 @@ final launchGateProvider = FutureProvider<GateDecision>((ref) async {
     final config = LaunchConfig.fromJson(
       Map<String, dynamic>.from((response.data as Map)['data'] as Map),
     );
+    ref.read(brandLogoProvider.notifier).state =
+        resolveAsset(config.brandLogo);
     return gateStatus(
       current: info.version,
       minimum: config.minVersions[AppConfig.audience] ?? '1.0.0',
