@@ -10,7 +10,7 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: DdeHandymanApp()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Handyman sign in'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
     expect(find.byType(TextField), findsWidgets);
   });
 }

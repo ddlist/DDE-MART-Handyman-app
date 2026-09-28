@@ -1,4 +1,4 @@
-// DDE-Mart handyman app — payouts, SOS + profile (original).
+// DDE-Mart handyman app — payouts, SOS + profile.
 //
 // GET|POST /worker/payouts, POST /worker/sos (GPS fill when available),
 // GET /worker/me + POST /worker/logout.
@@ -79,88 +79,156 @@ class _WorkerPayoutsScreenState extends ConsumerState<WorkerPayoutsScreen> {
   @override
   Widget build(BuildContext context) {
     final payouts = ref.watch(workerPayoutsProvider);
+    final scheme = Theme.of(context).colorScheme;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text('Request payout', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _amount,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Amount'),
-        ),
-        DropdownButtonFormField<String>(
-          initialValue: _method,
-          items: [
-            for (final m in _methods) DropdownMenuItem(value: m, child: Text(m)),
-          ],
-          onChanged: (value) => setState(() => _method = value ?? _methods.first),
-          decoration: const InputDecoration(labelText: 'Method'),
-        ),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: _busy
-              ? null
-              : () async {
-                  final amount = double.tryParse(_amount.text.trim()) ?? 0;
-                  if (amount < 1) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Enter an amount of at least 1.')),
-                    );
-                    return;
-                  }
-                  setState(() => _busy = true);
-                  final messenger = ScaffoldMessenger.of(context);
-                  try {
-                    await ref
-                        .read(workerPayoutsApiProvider)
-                        .request(amount: amount, method: _method);
-                    ref.invalidate(workerPayoutsProvider);
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('Payout requested.')),
-                    );
-                  } catch (e) {
-                    messenger.showSnackBar(
-                      SnackBar(content: Text(apiMessage(e))),
-                    );
-                  } finally {
-                    if (mounted) setState(() => _busy = false);
-                  }
-                },
-          child: Text(_busy ? 'Sending…' : 'Request'),
-        ),
-        const SizedBox(height: 16),
-        Text('History', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        payouts.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text(apiMessage(e)),
-          data: (rows) {
-            if (rows.isEmpty) {
-              return const EmptyState(
-                message: 'No payouts yet. Request one above.',
-                icon: Icons.payments_outlined,
-              );
-            }
-            return Column(
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(workerPayoutsProvider),
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 24),
+        children: [
+          GradientHeader(
+            title: 'Payouts',
+            subtitle: 'Request earnings, track history',
+            icon: Icons.payments_outlined,
+            trailing: IconButton(
+              icon: const Icon(Icons.refresh_outlined, color: Colors.white),
+              onPressed: () => ref.invalidate(workerPayoutsProvider),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final row in rows)
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(
-                          Icons.account_balance_outlined),
-                      title: Text(
-                          '${row['amount']} · ${row['method'] ?? ''}'),
-                      trailing: StatusChip(
-                          status: '${row['status'] ?? ''}'),
-                    ),
+                SleekCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Request payout',
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Minimum 1.00 — arrives via your chosen method.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _amount,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Amount',
+                          prefixIcon: Icon(Icons.currency_rupee_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _method,
+                        items: [
+                          for (final m in _methods)
+                            DropdownMenuItem(value: m, child: Text(m)),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _method = value ?? _methods.first),
+                        decoration: const InputDecoration(
+                          labelText: 'Method',
+                          prefixIcon: Icon(Icons.account_balance_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _busy
+                              ? null
+                              : () async {
+                                  final amount =
+                                      double.tryParse(_amount.text.trim()) ?? 0;
+                                  if (amount < 1) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Enter an amount of at least 1.')),
+                                    );
+                                    return;
+                                  }
+                                  setState(() => _busy = true);
+                                  final messenger =
+                                      ScaffoldMessenger.of(context);
+                                  try {
+                                    await ref
+                                        .read(workerPayoutsApiProvider)
+                                        .request(
+                                            amount: amount, method: _method);
+                                    ref.invalidate(workerPayoutsProvider);
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                          content:
+                                              Text('Payout requested.')),
+                                    );
+                                  } catch (e) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                          content: Text(apiMessage(e))),
+                                    );
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => _busy = false);
+                                    }
+                                  }
+                                },
+                          child: Text(_busy ? 'Sending…' : 'Request'),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 16),
+                Text('History',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                payouts.when(
+                  loading: () => const ShimmerList(rows: 2),
+                  error: (e, _) => ErrorRetry(
+                    error: e,
+                    onRetry: () => ref.invalidate(workerPayoutsProvider),
+                  ),
+                  data: (rows) {
+                    if (rows.isEmpty) {
+                      return const SleekCard(
+                        child: EmptyState(
+                          message: 'No payouts yet. Request one above.',
+                          icon: Icons.payments_outlined,
+                        ),
+                      );
+                    }
+                    return SleekCard(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Column(
+                        children: [
+                          for (var i = 0; i < rows.length; i++) ...[
+                            BillRow(row: rows[i]),
+                            if (i != rows.length - 1)
+                              Divider(
+                                height: 1,
+                                color: scheme.outlineVariant
+                                    .withValues(alpha: 0.5),
+                              ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ],
-            );
-          },
-        ),
-      ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -186,95 +254,179 @@ class _WorkerSosScreenState extends ConsumerState<WorkerSosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.only(bottom: 24),
       children: [
-        const Text(
-          'Emergency SOS. Sends your location to DDE-Mart safety staff.',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        GradientHeader(
+          title: 'Emergency SOS',
+          subtitle: 'Sends your location to DDE-Mart safety staff.',
+          icon: Icons.sos_outlined,
         ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.my_location_outlined),
-          label: const Text('Fill from GPS'),
-          onPressed: _busy
-              ? null
-              : () async {
-                  final ok = await ref
-                      .read(permissionServiceProvider)
-                      .ensure(context, AppPermission.location);
-                  if (!ok) return;
-                  if (!await Geolocator.isLocationServiceEnabled()) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text(
-                                'Location services are off. Enable GPS.')),
-                      );
-                    }
-                    return;
-                  }
-                  try {
-                    final position =
-                        await Geolocator.getCurrentPosition();
-                    _lat.text = '${position.latitude}';
-                    _lng.text = '${position.longitude}';
-                  } catch (_) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content:
-                                Text('Could not fix location.')),
-                      );
-                    }
-                  }
-                },
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _lat,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-          decoration: const InputDecoration(labelText: 'Latitude'),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _lng,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-          decoration: const InputDecoration(labelText: 'Longitude'),
-        ),
-        const SizedBox(height: 20),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: Colors.red),
-          onPressed: _busy
-              ? null
-              : () async {
-                  final lat = double.tryParse(_lat.text.trim());
-                  final lng = double.tryParse(_lng.text.trim());
-                  if (lat == null || lng == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Enter valid coordinates.')),
-                    );
-                    return;
-                  }
-                  setState(() => _busy = true);
-                  final messenger = ScaffoldMessenger.of(context);
-                  try {
-                    await ref.read(workerPayoutsApiProvider).sos(
-                          latitude: lat,
-                          longitude: lng,
-                        );
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('SOS sent. Help is on the way.')),
-                    );
-                  } catch (e) {
-                    messenger.showSnackBar(
-                      SnackBar(content: Text(apiMessage(e))),
-                    );
-                  } finally {
-                    if (mounted) setState(() => _busy = false);
-                  }
-                },
-          child: Text(_busy ? 'Sending…' : 'SEND SOS'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Column(
+            children: [
+              SleekCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: scheme.errorContainer,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(Icons.location_on_outlined,
+                              color: scheme.onErrorContainer),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Your location',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall),
+                              Text(
+                                'Auto-fill with GPS or enter manually.',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.my_location_outlined),
+                        label: const Text('Fill from GPS'),
+                        onPressed: _busy
+                            ? null
+                            : () async {
+                                final ok = await ref
+                                    .read(permissionServiceProvider)
+                                    .ensure(
+                                        context, AppPermission.location);
+                                if (!ok) return;
+                                if (!await Geolocator
+                                    .isLocationServiceEnabled()) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Location services are off. Enable GPS.')),
+                                    );
+                                  }
+                                  return;
+                                }
+                                try {
+                                  final position = await Geolocator
+                                      .getCurrentPosition();
+                                  _lat.text = '${position.latitude}';
+                                  _lng.text = '${position.longitude}';
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Could not fix location.')),
+                                    );
+                                  }
+                                }
+                              },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _lat,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(
+                              decimal: true, signed: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Latitude',
+                        prefixIcon: Icon(Icons.explore_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _lng,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(
+                              decimal: true, signed: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Longitude',
+                        prefixIcon: Icon(Icons.explore_outlined),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: scheme.error,
+                    foregroundColor: scheme.onError,
+                  ),
+                  onPressed: _busy
+                      ? null
+                      : () async {
+                          final lat =
+                              double.tryParse(_lat.text.trim());
+                          final lng =
+                              double.tryParse(_lng.text.trim());
+                          if (lat == null || lng == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Enter valid coordinates.')),
+                            );
+                            return;
+                          }
+                          setState(() => _busy = true);
+                          final messenger =
+                              ScaffoldMessenger.of(context);
+                          try {
+                            await ref
+                                .read(workerPayoutsApiProvider)
+                                .sos(
+                                  latitude: lat,
+                                  longitude: lng,
+                                );
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'SOS sent. Help is on the way.')),
+                            );
+                          } catch (e) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                  content: Text(apiMessage(e))),
+                            );
+                          } finally {
+                            if (mounted) setState(() => _busy = false);
+                          }
+                        },
+                  child: Text(_busy ? 'Sending…' : 'SEND SOS'),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -288,46 +440,128 @@ class WorkerProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStoreProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final scheme = Theme.of(context).colorScheme;
 
     return FutureBuilder<Map<String, dynamic>>(
       future: ref.watch(workerAuthApiProvider).me(),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 24),
+            children: const [
+              GradientHeader(title: 'Profile', subtitle: 'Loading…'),
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: ShimmerList(rows: 3),
+              ),
+            ],
+          );
+        }
         final me = snapshot.data;
         final name = '${me?['name'] ?? auth.name ?? 'Handyman'}';
         final initial =
             name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.only(bottom: 24),
           children: [
-            if (snapshot.hasError) Text(apiMessage(snapshot.error!)),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 44),
+              decoration: BoxDecoration(
+                gradient: DdeHandymanTheme.headerGradient(context),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(DdeHandymanTheme.radiusSheet),
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 28,
-                      child: Text(initial,
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          width: 2,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 30,
+                        backgroundColor:
+                            Colors.white.withValues(alpha: 0.2),
+                        child: Text(
+                          initial,
                           style: Theme.of(context)
                               .textTheme
-                              .headlineSmall),
+                              .headlineSmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(name,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge),
                           Text(
-                              '${me?['phone'] ?? auth.phone ?? ''}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall),
+                            name,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
+                                ),
+                          ),
+                          Text(
+                            '${me?['phone'] ?? auth.phone ?? ''}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Colors.white
+                                      .withValues(alpha: 0.85),
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          // Avatar/photo uploads: worker API has no
+                          // POST /worker/uploads endpoint — photos stay as-is.
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color:
+                                  Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(
+                                  DdeHandymanTheme.radiusPill),
+                              border: Border.all(
+                                  color: Colors.white
+                                      .withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.verified_outlined,
+                                    color: Colors.white, size: 14),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${me?['status'] ?? 'active'}'
+                                      .toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -335,92 +569,147 @@ class WorkerProfileScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Card(
-              child: ListTile(
-                leading:
-                    const Icon(Icons.handyman_outlined),
-                title: const Text('My jobs'),
-                trailing:
-                    const Icon(Icons.chevron_right),
-                onTap: () => context.safePush('/jobs'),
-              ),
-            ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: Transform.translate(
+                offset: const Offset(0, -20),
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
                   children: [
-                    Text('Appearance',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall),
-                    const SizedBox(height: 8),
-                    SegmentedButton<ThemeMode>(
-                      segments: const [
-                        ButtonSegment(
-                            value: ThemeMode.system,
-                            label: Text('Auto')),
-                        ButtonSegment(
-                            value: ThemeMode.light,
-                            label: Text('Light')),
-                        ButtonSegment(
-                            value: ThemeMode.dark,
-                            label: Text('Dark')),
-                      ],
-                      selected: {themeMode},
-                      onSelectionChanged: (set) => ref
-                          .read(themeModeProvider.notifier)
-                          .set(set.first),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            FilledButton.tonal(
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Sign out?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () =>
-                            Navigator.pop(context, false),
-                        child: const Text('Stay'),
+                    if (snapshot.hasError)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: SleekCard(
+                          child: Row(
+                            children: [
+                              Icon(Icons.error_outline,
+                                  color: scheme.error),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                  child: Text(
+                                      apiMessage(snapshot.error!))),
+                            ],
+                          ),
+                        ),
                       ),
-                      FilledButton(
-                        onPressed: () =>
-                            Navigator.pop(context, true),
+                    SleekCard(
+                      onTap: () => context.safePush('/jobs'),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8),
+                      child: ListTile(
+                        leading: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            gradient:
+                                DdeHandymanTheme.accentGradient(
+                                    context),
+                            borderRadius:
+                                BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                              Icons.handyman_outlined,
+                              color: Colors.white),
+                        ),
+                        title: const Text('My jobs'),
+                        subtitle: const Text(
+                            'Queue, details and history'),
+                        trailing: Icon(Icons.chevron_right,
+                            color: scheme.onSurfaceVariant),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SleekCard(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text('Appearance',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall),
+                          const SizedBox(height: 10),
+                          SegmentedButton<ThemeMode>(
+                            segments: const [
+                              ButtonSegment(
+                                  value: ThemeMode.system,
+                                  label: Text('Auto')),
+                              ButtonSegment(
+                                  value: ThemeMode.light,
+                                  label: Text('Light')),
+                              ButtonSegment(
+                                  value: ThemeMode.dark,
+                                  label: Text('Dark')),
+                            ],
+                            selected: {themeMode},
+                            onSelectionChanged: (set) => ref
+                                .read(themeModeProvider.notifier)
+                                .set(set.first),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonal(
+                        onPressed: () async {
+                          final confirm =
+                              await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Sign out?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(
+                                      context, false),
+                                  child: const Text('Stay'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(
+                                      context, true),
+                                  child: const Text('Sign out'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm != true || !context.mounted) {
+                            return;
+                          }
+                          try {
+                            await ref
+                                .read(workerAuthApiProvider)
+                                .logout();
+                          } finally {
+                            await ref
+                                .read(pushServiceProvider)
+                                .unregister();
+                            await ref
+                                .read(authStoreProvider.notifier)
+                                .signOut();
+                            if (context.mounted) context.go('/login');
+                          }
+                        },
                         child: const Text('Sign out'),
                       ),
-                    ],
-                  ),
-                );
-                if (confirm != true || !context.mounted) return;
-                try {
-                  await ref.read(workerAuthApiProvider).logout();
-                } finally {
-                  await ref.read(pushServiceProvider).unregister();
-                  await ref.read(authStoreProvider.notifier).signOut();
-                  if (context.mounted) context.go('/login');
-                }
-              },
-              child: const Text('Sign out'),
-            ),
-            const SizedBox(height: 16),
-            FutureBuilder<PackageInfo>(
-              future: PackageInfo.fromPlatform(),
-              builder: (context, info) => Center(
-                child: Text(
-                  (info.data?.version ?? '').isEmpty
-                      ? ''
-                      : 'v${info.data!.version}',
-                  style:
-                      Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    FutureBuilder<PackageInfo>(
+                      future: PackageInfo.fromPlatform(),
+                      builder: (context, info) => Center(
+                        child: Text(
+                          (info.data?.version ?? '').isEmpty
+                              ? ''
+                              : 'v${info.data!.version}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

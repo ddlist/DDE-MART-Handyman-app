@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../core/widgets.dart';
 import 'worker_auth_api.dart';
 
 class WorkerLoginScreen extends ConsumerStatefulWidget {
@@ -116,103 +117,148 @@ class _WorkerLoginScreenState
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Handyman sign in')),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.zero,
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Welcome back',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall),
-                  const SizedBox(height: 4),
-                  const Text(
-                      'Your provider registers your number. Sign in with a code.'),
-                ],
-              ),
-            ),
+          GradientHeader(
+            title: 'Welcome back',
+            subtitle:
+                'Your provider registers your number. Sign in with a code.',
+            icon: Icons.handyman_outlined,
           ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _phone,
-            keyboardType: TextInputType.phone,
-            enabled: !_codeSent,
-            decoration: InputDecoration(
-              labelText: 'Phone',
-              suffixIcon: _codeSent
-                  ? TextButton(
-                      onPressed: () => setState(() {
-                        _codeSent = false;
-                        _debugCode = null;
-                      }),
-                      child: const Text('Change'),
-                    )
-                  : null,
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (!_codeSent)
-            FilledButton(
-              onPressed: _busySend ? null : _send,
-              child: Text(
-                  _busySend ? 'Sending…' : 'Send code'),
-            )
-          else ...[
-            TextField(
-              controller: _code,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: const InputDecoration(
-                  labelText: '6-digit code'),
-              onChanged: (value) {
-                if (value.trim().length >= 6 && !_busyVerify) {
-                  _verify();
-                }
-              },
-            ),
-            if (_debugCode != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  'Debug code: $_debugCode',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              children: [
+                SleekCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _codeSent ? 'Enter code' : 'Phone number',
+                        style:
+                            Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _codeSent
+                            ? 'We sent a 6-digit code to ${_phone.text.trim()}.'
+                            : 'Use the number your provider registered.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _phone,
+                        keyboardType: TextInputType.phone,
+                        enabled: !_codeSent,
+                        decoration: InputDecoration(
+                          labelText: 'Phone',
+                          prefixIcon:
+                              const Icon(Icons.phone_outlined),
+                          suffixIcon: _codeSent
+                              ? TextButton(
+                                  onPressed: () => setState(() {
+                                    _codeSent = false;
+                                    _debugCode = null;
+                                  }),
+                                  child: const Text('Change'),
+                                )
+                              : null,
+                        ),
+                      ),
+                      if (_codeSent) ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _code,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          decoration: const InputDecoration(
+                            labelText: '6-digit code',
+                            prefixIcon:
+                                Icon(Icons.lock_outline),
+                          ),
+                          onChanged: (value) {
+                            if (value.trim().length >= 6 &&
+                                !_busyVerify) {
+                              _verify();
+                            }
+                          },
+                        ),
+                        if (_debugCode != null)
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Debug code: $_debugCode',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: scheme.primary),
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: _busyVerify ? null : _verify,
-              child: Text(_busyVerify
-                  ? 'Verifying…'
-                  : 'Verify & sign in'),
+                const SizedBox(height: 12),
+                if (!_codeSent)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _busySend ? null : _send,
+                      child: Text(
+                          _busySend ? 'Sending…' : 'Send code'),
+                    ),
+                  )
+                else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed:
+                          _busyVerify ? null : _verify,
+                      child: Text(_busyVerify
+                          ? 'Verifying…'
+                          : 'Verify & sign in'),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: (_busySend || _cooldown > 0)
+                        ? null
+                        : _send,
+                    child: Text(_cooldown > 0
+                        ? 'Resend in $_cooldown s'
+                        : 'Resend code'),
+                  ),
+                ],
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  SleekCard(
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline,
+                            color: scheme.error),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _error!,
+                            style: TextStyle(
+                                color: scheme.error),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
-            TextButton(
-              onPressed:
-                  (_busySend || _cooldown > 0) ? null : _send,
-              child: Text(_cooldown > 0
-                  ? 'Resend in $_cooldown s'
-                  : 'Resend code'),
-            ),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.error),
-            ),
-          ],
+          ),
         ],
       ),
     );

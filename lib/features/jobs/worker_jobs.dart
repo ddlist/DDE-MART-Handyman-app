@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
 import '../../core/nav.dart';
+import '../../core/theme.dart';
 import '../../core/widgets.dart';
 
 class WorkerJob {
@@ -66,6 +67,14 @@ class WorkerJobsApi {
   Future<void> transition({required int id, required String to}) async {
     await _dio.post('/worker/jobs/$id/transition', data: {'to': to});
   }
+
+  /// Public stories feed (GET /stories) for the jobs-tab rail.
+  Future<List<Map<String, dynamic>>> fetchStories() async {
+    final response = await _dio.get('/stories');
+    return (((response.data as Map)['data'] as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
 }
 
 final workerJobsApiProvider = Provider<WorkerJobsApi>(
@@ -76,86 +85,141 @@ final workerJobsProvider = FutureProvider<List<WorkerJob>>((ref) async {
   return ref.watch(workerJobsApiProvider).jobs();
 });
 
+final workerStoriesProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  return ref.watch(workerJobsApiProvider).fetchStories();
+});
+
 class WorkerJobsScreen extends ConsumerWidget {
   const WorkerJobsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final jobs = ref.watch(workerJobsProvider);
+    final stories = ref.watch(workerStoriesProvider);
 
     return jobs.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(apiMessage(e)),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () => ref.invalidate(workerJobsProvider),
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
+      loading: () => ListView(
+        padding: const EdgeInsets.all(16),
+        children: const [
+          GradientHeader(title: 'My jobs', subtitle: 'Loading your queue…'),
+          SizedBox(height: 16),
+          ShimmerList(rows: 3),
+        ],
       ),
-      data: (rows) => RefreshIndicator(
-        onRefresh: () async => ref.invalidate(workerJobsProvider),
-        child: rows.isEmpty
-            ? const EmptyState(
-                message: 'No jobs assigned. New jobs pop up here.',
-                icon: Icons.handyman_outlined,
-              )
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  for (final job in rows)
-                    Card(
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () =>
-                            context.safePush('/job/${job.id}'),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '${job.number} · ${job.customer}',
-                                      style: const TextStyle(
-                                          fontWeight:
-                                              FontWeight.w700),
-                                    ),
-                                  ),
-                                  StatusChip(
-                                      status: job.status),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Text(
-                                    'Total ${job.total.toStringAsFixed(2)}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall,
-                                  ),
-                                  const Spacer(),
-                                  const Icon(Icons.chevron_right,
-                                      size: 20),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+      error: (e, _) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const GradientHeader(
+              title: 'My jobs', subtitle: 'Something went wrong'),
+          const SizedBox(height: 16),
+          ErrorRetry(
+              error: e, onRetry: () => ref.invalidate(workerJobsProvider)),
+        ],
+      ),
+      data: (rows) {
+        final active =
+            rows.where((j) => nextMoves(j.status).isNotEmpty).length;
+        return RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(workerJobsProvider);
+            ref.invalidate(workerStoriesProvider);
+          },
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 24),
+            children: [
+              GradientHeader(
+                title: 'My jobs',
+                subtitle:
+                    '${rows.length} assigned · $active need action',
+                trailing: IconButton(
+                  icon: const Icon(Icons.refresh_outlined,
+                      color: Colors.white),
+                  onPressed: () {
+                    ref.invalidate(workerJobsProvider);
+                    ref.invalidate(workerStoriesProvider);
+                  },
+                ),
               ),
-      ),
+              stories.when(
+                data: (items) => StoryStrip(stories: items),
+                loading: () => const SizedBox(height: 8),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: rows.isEmpty
+                    ? const EmptyState(
+                        message: 'No jobs assigned. New jobs pop up here.',
+                        icon: Icons.handyman_outlined,
+                      )
+                    : Column(
+                        children: [
+                          for (final job in rows) ...[
+                            SleekCard(
+                              onTap: () =>
+                                  context.safePush('/job/${job.id}'),
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '${job.number} · ${job.customer}',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium,
+                                        ),
+                                      ),
+                                      StatusChip(status: job.status),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.payments_outlined,
+                                        size: 16,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Total ${job.total.toStringAsFixed(2)}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                      ),
+                                      const Spacer(),
+                                      Icon(
+                                        Icons.chevron_right,
+                                        size: 20,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -193,128 +257,265 @@ class _WorkerJobDetailScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Job')),
       body: FutureBuilder<Map<String, dynamic>>(
         future: ref.watch(workerJobsApiProvider).job(widget.jobId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 24),
+              children: const [
+                GradientHeader(title: 'Job', subtitle: 'Loading details…'),
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: ShimmerList(rows: 3),
+                ),
+              ],
+            );
           }
           if (snapshot.hasError) {
-            return Center(child: Text(apiMessage(snapshot.error!)));
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 24),
+              children: [
+                const GradientHeader(
+                    title: 'Job', subtitle: 'Could not load job'),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ErrorRetry(
+                    error: snapshot.error!,
+                    onRetry: () => setState(() {}),
+                  ),
+                ),
+              ],
+            );
           }
           final job = snapshot.data!;
           final status = '${job['status']}';
           final timeline = ((job['timeline'] as List?) ?? [])
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
+          final scheme = Theme.of(context).colorScheme;
 
           return RefreshIndicator(
             onRefresh: () async {
               ref.invalidate(workerJobsProvider);
+              if (mounted) setState(() {});
             },
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.only(bottom: 24),
               children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.fromLTRB(20, 28, 20, 44),
+                  decoration: BoxDecoration(
+                    gradient:
+                        DdeHandymanTheme.headerGradient(context),
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(
+                          DdeHandymanTheme.radiusSheet),
+                    ),
+                  ),
+                  child: SafeArea(
+                    bottom: false,
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back,
+                                  color: Colors.white),
+                              onPressed: () =>
+                                  context.safePush('/jobs'),
+                            ),
                             Expanded(
                               child: Text(
                                 '${job['number'] ?? 'Job #${job['id']}'}',
                                 style: Theme.of(context)
                                     .textTheme
-                                    .titleLarge,
+                                    .headlineSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.5,
+                                    ),
                               ),
                             ),
-                            StatusChip(status: status),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white
+                                    .withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(
+                                    DdeHandymanTheme.radiusPill),
+                                border: Border.all(
+                                    color: Colors.white.withValues(
+                                        alpha: 0.35)),
+                              ),
+                              child: Text(
+                                status
+                                    .replaceAll('_', ' ')
+                                    .toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Total ${job['total'] ?? ''}',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall,
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.payments_outlined,
+                                color: Colors.white70, size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Total ${job['total'] ?? ''} · ${job['customer'] ?? 'Customer'}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(
+                                        alpha: 0.9),
+                                  ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Card(
-                  child: ListTile(
-                    leading:
-                        const Icon(Icons.person_outline),
-                    title: Text(
-                        '${job['customer'] ?? 'Customer'}'),
-                    subtitle: Text(
-                        '${job['address'] ?? 'No address on file'}'),
-                  ),
-                ),
-                if ('${job['notes'] ?? ''}'.isNotEmpty)
-                  Card(
-                    child: ListTile(
-                      leading:
-                          const Icon(Icons.note_outlined),
-                      title: const Text('Notes'),
-                      subtitle: Text('${job['notes']}'),
-                    ),
-                  ),
-                if (nextMoves(status).isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final move in nextMoves(status))
-                        FilledButton.tonal(
-                          onPressed:
-                              _busy ? null : () => _move(move),
-                          child: Text(move),
-                        ),
-                    ],
-                  ),
-                ],
-                if (timeline.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
-                          Text('Timeline',
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                  child: Transform.translate(
+                    offset: const Offset(0, -20),
+                    child: Column(
+                      children: [
+                        SleekCard(
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                gradient: DdeHandymanTheme
+                                    .accentGradient(context),
+                                borderRadius:
+                                    BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                  Icons.person_outline,
+                                  color: Colors.white),
+                            ),
+                            title: Text(
+                                '${job['customer'] ?? 'Customer'}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall),
+                            subtitle: Text(
+                              '${job['address'] ?? 'No address on file'}',
                               style: Theme.of(context)
                                   .textTheme
-                                  .titleMedium),
-                          const SizedBox(height: 8),
-                          for (final entry in timeline)
-                            ListTile(
-                              contentPadding:
-                                  EdgeInsets.zero,
-                              leading: Icon(
-                                Icons.circle,
-                                size: 10,
-                                color: StatusChip.colorFor(
-                                    '${entry['to'] ?? entry['to_status'] ?? ''}'),
-                              ),
-                              title: Text(
-                                  '${entry['to'] ?? entry['to_status'] ?? ''}'),
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
                             ),
+                          ),
+                        ),
+                        if ('${job['notes'] ?? ''}'.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          SleekCard(
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.note_outlined,
+                                  color: scheme.primary),
+                              title: const Text('Notes'),
+                              subtitle:
+                                  Text('${job['notes']}'),
+                            ),
+                          ),
                         ],
-                      ),
+                        if (nextMoves(status).isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          SleekCard(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text('Next step',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall),
+                                const SizedBox(height: 10),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    for (final move
+                                        in nextMoves(status))
+                                      FilledButton(
+                                        onPressed: _busy
+                                            ? null
+                                            : () => _move(move),
+                                        child: Text(_busy
+                                            ? 'Working…'
+                                            : move),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (timeline.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          SleekCard(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text('History',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium),
+                                const SizedBox(height: 12),
+                                TimelineDots(entries: timeline),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 12),
+                          SleekCard(
+                            child: Row(
+                              children: [
+                                Icon(Icons.history_outlined,
+                                    color: scheme.onSurfaceVariant),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'No history yet — moves will appear here.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: scheme
+                                              .onSurfaceVariant,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                ],
-                const SizedBox(height: 80),
+                ),
+                const SizedBox(height: 60),
               ],
             ),
           );

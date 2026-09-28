@@ -10,6 +10,7 @@ import 'core/api_client.dart';
 import 'core/auth_store.dart';
 import 'core/config.dart';
 import 'core/gate.dart';
+import 'core/widgets.dart';
 import 'features/account/more.dart';
 import 'features/auth/worker_login_screen.dart';
 import 'features/jobs/worker_jobs.dart';
@@ -129,9 +130,9 @@ class WorkerShell extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(child: child),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (value) {
+      bottomNavigationBar: SleekBottomBar(
+        index: index,
+        onTap: (value) {
           switch (value) {
             case 0:
               context.go('/jobs');
@@ -143,12 +144,6 @@ class WorkerShell extends StatelessWidget {
               context.go('/profile');
           }
         },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.handyman_outlined), label: 'Jobs'),
-          NavigationDestination(icon: Icon(Icons.payments_outlined), label: 'Payouts'),
-          NavigationDestination(icon: Icon(Icons.sos_outlined), label: 'SOS'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-        ],
       ),
     );
   }
@@ -160,23 +155,35 @@ class MaintenanceScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.construction_outlined, size: 64),
-              const SizedBox(height: 16),
-              const Text('DDE-Mart is under maintenance', textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => ref.invalidate(launchGateProvider),
-                child: const Text('Retry'),
-              ),
-            ],
+      body: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          const GradientHeader(
+            title: 'Under maintenance',
+            subtitle: 'DDE-Mart is getting a tune-up.',
+            icon: Icons.construction_outlined,
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: SleekCard(
+              child: Column(
+                children: [
+                  const Text('Please check back shortly.',
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () =>
+                          ref.invalidate(launchGateProvider),
+                      child: const Text('Retry'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -188,21 +195,14 @@ class UpdateScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.system_update_outlined, size: 64),
-              SizedBox(height: 16),
-              Text(
-                'Please update DDE Handyman to continue.',
-                textAlign: TextAlign.center,
-              ),
-            ],
+      body: Column(
+        children: [
+          GradientHeader(
+            title: 'Update required',
+            subtitle: 'Please update DDE Handyman to continue.',
+            icon: Icons.system_update_outlined,
           ),
-        ),
+        ],
       ),
     );
   }
