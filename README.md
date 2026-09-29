@@ -1,36 +1,76 @@
-# DDE-Mart handyman app (clean-room rebuild)
+# DDE-Mart Handyman App
 
-Fresh Flutter app for provider staff (handymen) against `admin-panel` API v1
-worker surfaces (`docs/api-v1.md`, Worker section). No legacy code — this role
-never had an app; the backend login was added for it.
+The field-worker Flutter app for the DDE-Mart platform: assigned jobs
+with timeline, payouts, SOS and profile — against one backend API. (This
+role never had an app before; the worker login exists on the backend
+specifically for it.)
+
+- Backend: [DDE-MART-BACKEND](https://github.com/ddlist/DDE-MART-BACKEND) (`master`)
+- API reference: `admin-panel/docs/api-v1.md` (Worker section)
+
+## Features
+
+- **Auth** — OTP sign-in (`role=worker`; the provider must register the
+  phone first), profile, sign out.
+- **My jobs** — provider-assigned bookings, job detail with overlapping
+  cards + timeline, machine moves (placed → accepted/rejected/cancelled
+  → ongoing → completed).
+- **Payouts** — history + requests (bank/paypal/stripe/razorpay/
+  flutterwave/cash).
+- **SOS** — alert with GPS-filled coordinates.
+- **Stories** — promotional strip on the jobs tab.
+- **Platform** — launch gate (`/app-config`), admin brand logo in every
+  header, FCM push, dark mode, runtime permission flows (location,
+  notifications).
+
+## Setup
+
+Prerequisites: Flutter 3.41+ (`flutter doctor` clean), Android Studio or
+Xcode, and the backend running (see backend README).
+
+```sh
+git clone https://github.com/ddlist/DDE-MART-Handyman-app.git handyman
+cd handyman
+flutter pub get
+```
 
 ## Run
 
 ```sh
+# Herd/Valet domain (default baked into lib/core/config.dart):
 flutter run --dart-define=API_BASE_URL=http://dde-mart-admin.test/api/v1
+
+# Android emulator when .test doesn't resolve there:
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
+
+# Physical phone (same Wi-Fi; backend on 0.0.0.0:8000):
+flutter run --dart-define=API_BASE_URL=http://<pc-lan-ip>:8000/api/v1
 ```
 
-## What's wired
+Test accounts: create the worker under a provider in the admin panel
+(Providers → Workers, status `active`), then sign in with phone + OTP.
+Demo OTP codes appear in the backend log outside production. Seed demo
+data with `php artisan db:seed --class=DemoSeeder` (worker
+`0303333333`).
 
-- Launch gate (`/app-config`, `worker` audience) + maintenance/update screens.
-- OTP sign-in (`role=worker`; the provider must register the phone first),
-  profile, sign out.
-- My jobs: bookings assigned by the provider, detail timeline, machine moves
-  (placed → accepted/rejected/cancelled → ongoing → completed).
-- Payouts: history + request.
-- SOS with manual coordinates.
-- Push token register/unregister (see FIREBASE_SETUP.md).
+## Release build
 
-## Next (not yet)
+```sh
+flutter build appbundle --dart-define=API_BASE_URL=https://api.your-domain.com/api/v1
+flutter build ipa      --dart-define=API_BASE_URL=https://api.your-domain.com/api/v1
+```
 
-- Worker↔customer chat (threads link providers today; worker inbox pending).
-- GPS auto-fill for SOS (manual entry meanwhile).
-- Job assignment push topic for workers (backend fan-out targets providers).
-- Firebase native files per environment (not in repo).
+Push needs `google-services.json` / `GoogleService-Info.plist` per
+environment (see `FIREBASE_SETUP.md`) — never committed.
 
 ## Verify
 
 ```sh
-flutter analyze
-flutter test
+flutter analyze   # clean
+flutter test      # 15 tests: jobs, stories, branding, session, nav guards, boot
 ```
+
+## Support
+
+Installation, tech support, customization: **shariqq.com@gmail.com** ·
+WhatsApp **@shareeq9**.
