@@ -260,7 +260,7 @@ class _WorkerSosScreenState extends ConsumerState<WorkerSosScreen> {
       children: [
         GradientHeader(
           title: 'Emergency SOS',
-          subtitle: 'Sends your location to DDE-Mart safety staff.',
+          subtitle: 'Sends your location to Hometry safety staff.',
           icon: Icons.sos_outlined,
         ),
         Padding(

@@ -21,7 +21,7 @@ class DdeHandymanApp extends ConsumerWidget {
     ref.watch(pushSyncProvider);
 
     return MaterialApp.router(
-      title: 'DDE Handyman',
+      title: 'Hometry Handyman',
       debugShowCheckedModeBanner: false,
       theme: DdeHandymanTheme.light(),
       darkTheme: DdeHandymanTheme.dark(),

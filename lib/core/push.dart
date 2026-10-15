@@ -57,7 +57,7 @@ class PushService {
 
     const channel = AndroidNotificationChannel(
       'dde_handyman',
-      'DDE Handyman updates',
+      'Hometry Handyman updates',
       importance: Importance.high,
     );
     final local = FlutterLocalNotificationsPlugin();

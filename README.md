@@ -1,4 +1,4 @@
-# DDE-Mart Handyman App
+# Hometry Handyman App
 
 The field-worker Flutter app for the DDE-Mart platform: assigned jobs
 with timeline, payouts, SOS and profile â€” against one backend API. (This
@@ -36,8 +36,17 @@ flutter pub get
 
 ## Run
 
+Default API is live (`https://admin.hometry.in/api/v1` baked into
+`lib/core/config.dart`):
+
 ```sh
-# Herd/Valet domain (default baked into lib/core/config.dart):
+flutter run
+```
+
+Local-override examples:
+
+```sh
+# Herd/Valet domain:
 flutter run --dart-define=API_BASE_URL=http://dde-mart-admin.test/api/v1
 
 # Android emulator when .test doesn't resolve there:
@@ -55,9 +64,12 @@ data with `php artisan db:seed --class=DemoSeeder` (worker
 
 ## Release build
 
+Default API is live, so no `--dart-define` is needed:
+
 ```sh
-flutter build appbundle --dart-define=API_BASE_URL=https://api.your-domain.com/api/v1
-flutter build ipa      --dart-define=API_BASE_URL=https://api.your-domain.com/api/v1
+flutter build apk --release
+flutter build appbundle
+flutter build ipa
 ```
 
 Push needs `google-services.json` / `GoogleService-Info.plist` per
@@ -81,6 +93,6 @@ Built by [DDLIST](https://ddlist.github.io).
 
 ## License
 
-DDLIST Commercial Source License v1.0 — see [LICENSE](LICENSE). You may
+DDLIST Commercial Source License v1.0 ï¿½ see [LICENSE](LICENSE). You may
 use, run, edit, and modify the software for personal or business use,
 but you may not resell, redistribute, or republish it.
