@@ -43,7 +43,13 @@ android {
         create("release") {
             val storeFilePath = keystoreProperties["storeFile"] as String?
             if (storeFilePath != null) {
-                storeFile = rootProject.file(storeFilePath)
+                // Resolve relative to the app module first (standard
+                // Flutter layout: storeFile like ../<name>.jks lives in
+                // android/), falling back to the root project dir.
+                val candidate = file(storeFilePath)
+                storeFile =
+                    if (candidate.exists()) candidate
+                    else rootProject.file(storeFilePath)
             }
             storePassword = keystoreProperties["storePassword"] as String?
             keyAlias = keystoreProperties["keyAlias"] as String?
